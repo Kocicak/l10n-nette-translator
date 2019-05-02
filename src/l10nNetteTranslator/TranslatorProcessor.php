@@ -1,160 +1,188 @@
 <?php
+
 namespace l10nNetteTranslator;
 
 use Nette\Application\Responses\JsonResponse;
 use Nette\Http\IRequest;
 use Nette\InvalidStateException;
-use Nette\Object;
+use Nette\SmartObject;
 
-class TranslatorProcessor extends Object {
-	const PARAMETER = 'l10nNTP';
+class TranslatorProcessor
+{
+    use SmartObject;
 
-	/** @var \Nette\Http\IRequest */
-	private $request;
+    const PARAMETER = 'l10nNTP';
 
-	/** @var \l10nNetteTranslator\Translator */
-	private $translator;
+    /** @var \Nette\Http\IRequest */
+    private $request;
 
-	private $payload = [
-		'actions'   => [],
-		'language'  => null,
-		'languages' => [],
-		'texts'     => [],
-		'select'    => null,
-		'message'   => null,
-	];
+    /** @var \l10nNetteTranslator\Translator */
+    private $translator;
 
-	public function __construct(Translator $translator, IRequest $request) {
-		$this->translator = $translator;
-		$this->request = $request;
-	}
+    private $payload = [
+        'actions' => [],
+        'language' => null,
+        'languages' => [],
+        'texts' => [],
+        'select' => null,
+        'message' => null,
+    ];
 
-	protected function createHash($value) {
-		return hash('crc32b', self::PARAMETER . '-' . $value);
-	}
+    public function __construct(Translator $translator, IRequest $request)
+    {
+        $this->translator = $translator;
+        $this->request = $request;
+    }
 
-	protected function getRequestData() {
-		$request_data = (array)$this->request->getPost(self::PARAMETER);
-		$request_data += [
-			'action'   => null,
-			'key'      => null,
-			'language' => null,
-			'texts'    => []
-		];
+    protected function createHash($value)
+    {
+        return hash('crc32b', self::PARAMETER . '-' . $value);
+    }
 
-		if ($request_data['key'] && empty($request_data['id'])) {
-			$request_data['id'] = $this->createHash($request_data['key']);
-		}
+    protected function getRequestData()
+    {
+        $request_data = (array)$this->request->getPost(self::PARAMETER);
+        $request_data += [
+            'action' => null,
+            'key' => null,
+            'language' => null,
+            'texts' => []
+        ];
 
-		return $request_data;
-	}
+        if ($request_data['key'] && empty($request_data['id'])) {
+            $request_data['id'] = $this->createHash($request_data['key']);
+        }
 
-	protected function getPayload() {
-		return $this->payload;
-	}
+        return $request_data;
+    }
 
-	protected function initAction() {
-		$this->loadLanguagesAction();
-		$this->loadListAction();
-	}
+    protected function getPayload()
+    {
+        return $this->payload;
+    }
 
-	protected function loadLanguagesAction() {
-		foreach ($this->translator->getLanguagesAndPlurals() as $language_and_plural) {
-			$language = $language_and_plural->getLanguage();
-			$code = $language->getIso639_1();
+    protected function initAction()
+    {
+        $this->loadLanguagesAction();
+        $this->loadListAction();
+    }
 
-			$this->payload['languages'][$code] = [
-				'code'          => $code,
-				'original_name' => $language->getOriginalName(),
-				'english_name'  => $language->getEnglishName()
-			];
-		}
+    protected function loadLanguagesAction()
+    {
+        foreach ($this->translator->getLanguageAndPlurals() as $language_and_plural) {
+            $language = $language_and_plural->getLanguage();
+            $code = $language->getIso639_1();
 
-		$active_language_and_plural = $this->translator->getActiveLanguageAndPlural();
+            $this->payload['languages'][$code] = [
+                'code' => $code,
+                'namespace' => $this->translator->getActiveNamespace(),
+                'original_name' => $language->getOriginalName(),
+                'english_name' => $language->getEnglishName()
+            ];
+        }
 
-		$this->payload['language'] = $active_language_and_plural->getLanguage()->getIso639_1();
-		$this->payload['plurals_count'] = $active_language_and_plural->getPlural()->getPluralsCount();
-		$this->payload['actions'][] = 'buildLanguages';
-		$this->payload['actions'][] = 'setLanguage';
-		$this->payload['actions'][] = 'buildPluralsForm';
-	}
+        $active_language_and_plural = $this->translator->getActiveLanguageAndPlural();
 
-	protected function loadListAction() {
-		$translator = $this->translator->getTranslator();
-		$untranslated = $translator->getUntranslated();
-		$translated = $translator->getTranslated();
+        $this->payload['language'] = $active_language_and_plural->getLanguage()->getIso639_1();
+        $this->payload['namespace'] = $this->translator->getActiveNamespace();
+        $this->payload['plurals_count'] = $active_language_and_plural->getPlural()->getPluralsCount();
+        $this->payload['actions'][] = 'buildLanguages';
+        $this->payload['actions'][] = 'setLanguage';
+        $this->payload['actions'][] = 'buildPluralsForm';
+    }
 
-		$keys = array_keys($translated + $untranslated);
-		natsort($keys);
+    protected function loadListAction()
+    {
+        $translator = $this->translator->getTranslator();
+        $untranslated = $translator->getUntranslated();
+        $translated = $translator->getTranslated();
 
-		foreach ($keys as $key) {
-			$hash = $this->createHash($key);
-			$this->payload['texts'][$hash] = [
-				'id'     => $hash,
-				'key'    => $key,
-				'status' => (int)!isset($untranslated[$key]),
-				'texts'  => isset($translated[$key]) ? $translated[$key] : []
-			];
-		}
+        $keys = array_keys($translated + $untranslated);
+        natsort($keys);
 
-		$this->payload['actions'][] = 'buildList';
-	}
+        foreach ($keys as $key) {
+            $hash = $this->createHash($key);
+            $this->payload['texts'][$hash] = [
+                'id' => $hash,
+                'key' => $key,
+                'status' => (int)!isset($untranslated[$key]),
+                'texts' => isset($translated[$key]) ? $translated[$key] : []
+            ];
+        }
 
-	protected function saveTextAction(array $request_data) {
-		if ($request_data['texts']) {
-			$translator = $this->translator->getTranslator();
-			$translator->removeText($request_data['key']);
-			$active_language_and_plural = $this->translator->getActiveLanguageAndPlural();
-			$plurals_count = $active_language_and_plural->getPlural()->getPluralsCount();
+        $this->payload['actions'][] = 'buildList';
+    }
 
-			for ($plural = 0; $plural < $plurals_count; $plural += 1) {
-				if (isset($request_data['texts'][$plural]) && $request_data['texts'][$plural] != '') {
-					$translator->setText($request_data['key'], $request_data['texts'][$plural], $plural);
-				}
-			}
-		}
+    protected function saveTextAction(array $request_data)
+    {
+        $translator = $this->translator->getTranslator();
+        //$translator->removeText($request_data['key']);
+        $active_language_and_plural = $this->translator->getActiveLanguageAndPlural();
+        $plurals_count = $active_language_and_plural->getPlural()->getPluralsCount();
 
-		$this->loadListAction();
-		$this->payload['select'] = $this->createHash($request_data['key']);
-		$this->payload['actions'][] = 'selectItem';
-	}
+        for ($plural = 0; $plural < $plurals_count; $plural += 1) {
+            if (isset($request_data['texts']) && isset($request_data['texts'][$plural])) {
+                $translator->saveText($request_data['key'], $request_data['texts'][$plural], $plural);
+            } else {
+                $translator->saveText($request_data['key'], null, $plural);
+            }
+        }
 
-	protected function removeTextAction(array $request_data) {
-		$translator = $this->translator->getTranslator();
-		$translator->removeText($request_data['key']);
+        //$this->loadListAction();
+        $this->payload['select'] = $request_data['id'];
+        $this->payload['actions'][] = 'refreshRow';
+        $this->payload['actions'][] = 'successSave';
+        $this->payload['texts']['id'] = $request_data['id'];
+        $this->payload['texts']['key'] = $request_data['key'];
+        $this->payload['texts']['status'] = 1;
+        $this->payload['texts']['texts'] = (empty($request_data['texts']) ? [] : $request_data['texts']);
+    }
 
-		$this->loadListAction();
-		$this->payload['actions'][] = 'clean';
-	}
+    protected function removeTextAction(array $request_data)
+    {
+        $translator = $this->translator->getTranslator();
 
-	protected function callActionByRequest(array $request_data) {
-		$action = $request_data['action'] . 'Action';
+        if ($translator->removeText($request_data['key'])) {
+            $this->payload['actions'][] = 'successRemoveRow';
+            $this->payload['rowKey'] = $request_data['id'];
+        } else {
+            $this->payload['actions'][] = 'clean';
+        }
+    }
 
-		if (!method_exists($this, $action)) {
-			throw new InvalidStateException(sprintf('Action "%s" not found', $request_data['action']));
-		}
+    protected function callActionByRequest(array $request_data)
+    {
+        $action = $request_data['action'] . 'Action';
 
-		call_user_func([$this, $action], $request_data);
-	}
+        if (!method_exists($this, $action)) {
+            throw new InvalidStateException(sprintf('Action "%s" not found', $request_data['action']));
+        }
 
-	public function run() {
-		$request_data = $this->getRequestData();
+        call_user_func([$this, $action], $request_data);
+    }
 
-		if ($request_data['action']) {
-			try {
-				if ($request_data['language']) {
-					$this->translator->setActiveLanguageCode($request_data['language']);
-				}
+    public function run()
+    {
+        $request_data = $this->getRequestData();
 
-				$this->callActionByRequest($request_data);
-			}
-			catch (InvalidStateException $e) {
-				$this->payload['message'] = $e->getMessage();
-			}
+        if ($request_data['action']) {
+            try {
+                if (isset($request_data['namespace'])) {
+                    $this->translator->setActiveNamespace($request_data['namespace']);
+                }
 
-			return new JsonResponse($this->payload);
-		}
+                if (isset($request_data['language'])) {
+                    $this->translator->setActiveLanguageCode($request_data['language']);
+                }
 
-		return null;
-	}
+                $this->callActionByRequest($request_data);
+            } catch (InvalidStateException $e) {
+                $this->payload['message'] = $e->getMessage();
+            }
+
+            return new JsonResponse($this->payload);
+        }
+
+        return null;
+    }
 }

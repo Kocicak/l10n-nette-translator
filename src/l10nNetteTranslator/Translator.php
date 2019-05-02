@@ -1,4 +1,5 @@
 <?php
+
 namespace l10nNetteTranslator;
 
 use l10n\Language\ILanguage;
@@ -6,139 +7,190 @@ use l10n\Plural\IPlural;
 use l10nNetteTranslator\Storage\IStorage;
 use Nette\InvalidStateException;
 use Nette\Localization\ITranslator;
-use Nette\Object;
+use Nette\SmartObject;
 
-class Translator extends Object implements ITranslator {
-	/** @var \l10nNetteTranslator\LanguageAndPlural[] */
-	private $languages_and_plurals;
+class Translator implements ITranslator
+{
+    use SmartObject;
 
-	/** @var \l10nNetteTranslator\Storage\IStorage */
-	private $storage;
+    /** @var \l10nNetteTranslator\LanguageAndPlural[] */
+    private $languageAndPlurals;
 
-	/** @var \l10n\Translator\Translator */
-	private $translator;
+    /** @var \l10nNetteTranslator\Storage\IStorage */
+    private $storage;
 
-	/** @var string */
-	private $active_language_code;
+    /** @var \l10n\Translator\Translator */
+    private $translator;
 
-	/**
-	 * @param string $code
-	 */
-	protected function testLanguageCode($code) {
-		if (empty($this->languages_and_plurals[$code])) {
-			throw new InvalidStateException(sprintf('Language with code "%s" is not set', $code));
-		}
-	}
+    /**
+     * @var string $activeLanguageCode hodnota pro hlavni mutaci stranky, vyuziti u slovniku
+     */
+    private $activeLanguageCode = '';
 
-	/**
-	 * @param \l10n\Language\ILanguage $language
-	 * @param \l10n\Plural\IPlural     $plural
-	 * @param bool                     $default
-	 */
-	public function addLanguageAndPlural(ILanguage $language, IPlural $plural, $default = false) {
-		$language_and_plural = new LanguageAndPlural();
-		$language_and_plural->setLanguage($language);
-		$language_and_plural->setPlural($plural);
-		$code = $language->getIso639_1();
+    private $activeNamespace = '';
 
-		$this->languages_and_plurals[$code] = $language_and_plural;
+    /**
+     * @param string $code
+     */
+    protected function testLanguageCode($code)
+    {
+        if (empty($this->activeNamespace)) {
+            throw new InvalidStateException("Translator namespace is not set.");
+        }
+        if (empty($this->languageAndPlurals[$this->activeNamespace][$code])) {
+            throw new InvalidStateException(sprintf('Language with code "%s" is not set', $code));
+        }
+    }
 
-		if ($default || !$this->active_language_code) {
-			$this->setActiveLanguageCode($code);
-		}
-	}
+    /**
+     * @param \l10n\Language\ILanguage $language
+     * @param \l10n\Plural\IPlural $plural
+     * @param string $namespace namespace prekladu
+     * @param bool $default
+     */
+    public function addLanguageAndPlural(ILanguage $language, IPlural $plural, $namespace, $default = false)
+    {
+        $language_and_plural = new LanguageAndPlural();
+        $language_and_plural->setLanguage($language);
+        $language_and_plural->setPlural($plural);
+        $code = $language->getIso639_1();
 
-	/**
-	 * @param string $code
-	 * @throws InvalidStateException
-	 */
-	public function setActiveLanguageCode($code) {
-		$this->testLanguageCode($code);
-		$this->active_language_code = $code;
-		$this->translator = null;
-	}
+        if (!isset($this->languageAndPlurals[$namespace])) {
+            $this->languageAndPlurals[$namespace] = [];
+        }
+        $this->languageAndPlurals[$namespace][$code] = $language_and_plural;
 
-	/**
-	 * @return string|null
-	 */
-	public function getActiveLanguageCode() {
-		return $this->active_language_code;
-	}
+        if ($default || !$this->activeLanguageCode) {
+            $this->setActiveNamespace($namespace);
+            $this->setActiveLanguageCode($code);
+        }
+    }
 
-	/**
-	 * @param string $code
-	 * @return \l10nNetteTranslator\LanguageAndPlural
-	 * @throws InvalidStateException
-	 */
-	public function getLanguageAndPluralByCode($code) {
-		$this->testLanguageCode($code);
+    /**
+     * @param string $code
+     * @throws InvalidStateException
+     */
+    public function setActiveLanguageCode($code)
+    {
+        $this->testLanguageCode($code);
+        $this->activeLanguageCode = $code;
+        $this->translator = null;
+    }
 
-		return $this->languages_and_plurals[$code];
-	}
+    /**
+     * @return string|null
+     */
+    public function getActiveLanguageCode()
+    {
+        return $this->activeLanguageCode;
+    }
 
-	/**
-	 * @param string $code
-	 * @return bool
-	 */
-	public function hasLanguageAndPluralByCode($code) {
-		return isset($this->languages_and_plurals[$code]);
-	}
+    /**
+     * @param string $code
+     * @return \l10nNetteTranslator\LanguageAndPlural
+     * @throws InvalidStateException
+     */
+    public function getLanguageAndPluralByCode($code)
+    {
+        $this->testLanguageCode($code);
 
-	/**
-	 * @return \l10nNetteTranslator\LanguageAndPlural
-	 * @throws InvalidStateException
-	 */
-	public function getActiveLanguageAndPlural() {
-		return $this->getLanguageAndPluralByCode($this->active_language_code);
-	}
+        return $this->languageAndPlurals[$this->activeNamespace][$code];
+    }
 
-	/**
-	 * @return \l10nNetteTranslator\LanguageAndPlural[]
-	 */
-	public function getLanguagesAndPlurals() {
-		return $this->languages_and_plurals;
-	}
+    /**
+     * @param string $code
+     * @return bool
+     */
+    public function hasLanguageAndPluralByCode($code)
+    {
+        return isset($this->languageAndPlurals[$this->activeNamespace][$code]);
+    }
 
-	/**
-	 * @return \l10nNetteTranslator\Storage\IStorage
-	 */
-	public function getStorage() {
-		return $this->storage;
-	}
+    /**
+     * @return \l10nNetteTranslator\LanguageAndPlural
+     * @throws InvalidStateException
+     */
+    public function getActiveLanguageAndPlural()
+    {
+        return $this->getLanguageAndPluralByCode($this->activeLanguageCode);
+    }
 
-	/**
-	 * @param \l10nNetteTranslator\Storage\IStorage $storage
-	 */
-	public function setStorage(IStorage $storage) {
-		$this->storage = $storage;
-		$this->translator = null;
-	}
+    /**
+     * @return \l10nNetteTranslator\LanguageAndPlural[]
+     */
+    public function getLanguageAndPlurals()
+    {
+        if (empty($this->activeNamespace)) {
+            throw new InvalidStateException("Translator namespace not set.");
+        }
+        return $this->languageAndPlurals[$this->activeNamespace];
+    }
 
-	/**
-	 * @return \l10n\Translator\Translator
-	 */
-	public function getTranslator() {
-		if (!($this->translator instanceof \l10n\Translator\Translator)) {
-			$plural = $this->getActiveLanguageAndPlural()->getPlural();
-			$storage = $this->getStorage();
+    /**
+     * @return \l10nNetteTranslator\Storage\IStorage
+     */
+    public function getStorage()
+    {
+        return $this->storage;
+    }
 
-			if ($storage) {
-				$storage->setTranslator($this);
-			}
+    /**
+     * @param \l10nNetteTranslator\Storage\IStorage $storage
+     */
+    public function setStorage(IStorage $storage)
+    {
+        $this->storage = $storage;
+        $this->translator = null;
+    }
 
-			$this->translator = new \l10n\Translator\Translator($plural, $storage);
-		}
+    /**
+     * @return \l10n\Translator\Translator
+     */
+    public function getTranslator()
+    {
+        if (!($this->translator instanceof \l10n\Translator\Translator)) {
+            $plural = $this->getActiveLanguageAndPlural()->getPlural();
+            $storage = $this->getStorage();
 
-		return $this->translator;
-	}
+            if ($storage) {
+                $storage->setTranslator($this);
+            }
 
-	/**
-	 * @param string         $key
-	 * @param int|array|null $n When $n is null, than singular will be selected. When $n is an array, it's used as $parameters.
-	 * @param array          $parameters
-	 * @return string
-	 */
-	public function translate($key, $n = null, array $parameters = []) {
-		return $this->getTranslator()->translate($key, $n, $parameters);
-	}
+            $this->translator = new \l10n\Translator\Translator($plural, $storage);
+        }
+
+        return $this->translator;
+    }
+
+    /**
+     * @return string
+     */
+    public function getActiveNamespace(): string
+    {
+        return $this->activeNamespace;
+    }
+
+    /**
+     * @param string $activeNamespace
+     */
+    public function setActiveNamespace(string $activeNamespace): void
+    {
+        $this->activeNamespace = $activeNamespace;
+        $this->translator = null;
+    }
+
+    /**
+     * @param $key
+     * @param mixed ...$parameters
+     * @return string
+     */
+    public function translate($key, ...$parameters): string
+    {
+        $count = 1;
+        if (count($parameters) > 0 && is_int($parameters[0])) {
+            $count = array_shift($parameters);
+        }
+
+        return $this->getTranslator()->translate($key, $count, $parameters);
+    }
 }

@@ -1,41 +1,55 @@
 <?php
+
 namespace l10nNetteTranslator;
 
 use l10n\Language\ILanguage;
 use l10n\Plural\IPlural;
 
-class LanguageAndPlural {
-	/** @var ILanguage */
-	private $language;
+class LanguageAndPlural
+{
+    /** @var ILanguage */
+    private $language;
 
-	/** @var IPlural */
-	private $plural;
+    /** @var IPlural */
+    private $plural;
 
-	/**
-	 * @return ILanguage
-	 */
-	public function getLanguage() {
-		return $this->language;
-	}
+    /**
+     * @return ILanguage
+     */
+    public function getLanguage()
+    {
+        return $this->language;
+    }
 
-	/**
-	 * @param ILanguage $language
-	 */
-	public function setLanguage(ILanguage $language) {
-		$this->language = $language;
-	}
+    /**
+     * @param ILanguage $language
+     */
+    public function setLanguage(ILanguage $language)
+    {
+        $this->language = $language;
+    }
 
-	/**
-	 * @return IPlural
-	 */
-	public function getPlural() {
-		return $this->plural;
-	}
+    /**
+     * @return IPlural
+     */
+    public function getPlural()
+    {
+        return $this->plural;
+    }
 
-	/**
-	 * @param IPlural $plural
-	 */
-	public function setPlural(IPlural $plural) {
-		$this->plural = $plural;
-	}
+    /**
+     * @param IPlural $plural
+     */
+    public function setPlural(IPlural $plural)
+    {
+        $this->plural = $plural;
+    }
+
+    /**
+     * @return string
+     */
+    public function __toString(): string
+    {
+        return $this->language->getIso639_1();
+    }
 }
