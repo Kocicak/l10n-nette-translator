@@ -1,5 +1,5 @@
 {
-  "name": "Kocicak/l10n-nette-translator",
+  "name": "kocicak/l10n-nette-translator",
   "description": "Simple l10n translator panel for Tracy",
   "keywords": [
     "l10n",
@@ -22,13 +22,19 @@
   ],
   "require": {
     "php": ">=7.1",
-    "Kocicak/l10n": "1.*",
+    "kocicak/l10n": "^2.0",
     "nette/di": "^3.0",
     "nette/application": "^3.0",
     "nette/http": "^3.0",
     "nette/utils": "^3.0",
     "tracy/tracy": "^2.6"
   },
+  "repositories": [
+    {
+      "type": "git",
+      "url": "https://github.com/Kocicak/l10n.git"
+    }
+  ],
   "autoload": {
     "psr-4": {
       "l10nNetteTranslator\\": "src/l10nNetteTranslator"
