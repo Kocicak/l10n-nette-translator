@@ -180,17 +180,17 @@ class Translator implements ITranslator
     }
 
     /**
-     * @param $key
+     * @param string $message
      * @param mixed ...$parameters
      * @return string
      */
-    public function translate($key, ...$parameters): string
+    public function translate($message, ...$parameters): string
     {
         $count = 1;
         if (count($parameters) > 0 && is_int($parameters[0])) {
             $count = array_shift($parameters);
         }
 
-        return $this->getTranslator()->translate($key, $count, $parameters);
+        return $this->getTranslator()->translate((string)$message, $count, $parameters);
     }
 }
