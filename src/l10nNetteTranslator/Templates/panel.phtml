@@ -105,6 +105,12 @@
 	#l10nNTP-remove:hover {
 		background-color: #e77676 !important;
 	}
+
+    #l10nNTP-filter {
+        border: 1px solid gray;
+        background: white;
+    }
+
 </style>
 <script>
 	var l10nNTP = {
@@ -283,6 +289,11 @@
 				language: language,
                 namespace: namespace
 			});
+
+			var self = this;
+			this.getById('l10nNTP-filter').addEventListener("keyup", function() {
+			    self.filterList(this.value);
+            });
 		},
 		showMsg: function (msg) {
 			this.getById('l10nNTP-right_panel-msg').innerHTML = msg;
@@ -358,7 +369,29 @@
 			var obj = this.getById(response.select);
 			obj && this.click(obj);
 			obj && obj.scrollIntoView();
-		}
+		},
+        filterList: function(key) {
+		    var list = this.getById('l10nNTP-list').getElementsByTagName('li');
+
+            if(key.length == 0) {
+                for(let item of list) {
+                    item.style.display = "block";
+                }
+            } else {
+                for(let item of list) {
+                    key = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    var keyReg = new RegExp('"key":"[^"]*'+key+'[^"]*"','i');
+                    var textsReg = new RegExp('"texts":\\[[^\\]]*'+key+'[^\\]]*\\]*"','i')
+                    if(item.dataset.json.match(keyReg) || item.dataset.json.match(textsReg)) {
+                        item.style.display = "block";
+                    } else {
+                        item.style.display = "none";
+                    }
+                }
+            }
+        }
+
+
 	};
 </script>
 <div id="l10nNTP">
@@ -372,6 +405,7 @@
 				<td id="l10nNTP-left_panel">
 					<div id="l10nNTP-langs_wrapper">
 						<select id="l10nNTP-langs" onchange="l10nNTP.changeLanguage(this)"></select>
+                        <input type="text" id="l10nNTP-filter" placeholder="Search" size="10">
 					</div>
 					<div id="l10nNTP-list_wrapper">
 						<ul id="l10nNTP-list"></ul>
